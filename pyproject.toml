@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "sportscode-extract"
+version = "0.1.0"
+description = "Export a Sportscode playlist as an MP4 and XML timeline"
+requires-python = ">=3.10"
+dependencies = []
+[project.optional-dependencies]
+test = ["pytest>=7"]
+[project.scripts]
+sportscode-extract = "sportscode_extract.cli:main"
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]

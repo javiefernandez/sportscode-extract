@@ -1,0 +1,1 @@
+All fixtures are invented in tests/conftest.py and generated inside pytest's temporary directory using FFmpeg lavfi color/sine sources. No private package metadata or footage is stored here. Integration tests read the external SPORTSCODE_SAMPLES directory only.
