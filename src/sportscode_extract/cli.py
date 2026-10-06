@@ -13,6 +13,18 @@ from .export_xml import write_xml
 from .render import render
 from .validation import validate_export
 
+README = {
+    'angles': 'Open the assembled MP4 in Angles and import its matching Sportscode XML timeline.\n'
+              'XML compatibility: schema-matched, not application-tested. Manual Angles playback remains unverified.\n',
+    'focus': 'In Catapult Focus, create an Archive Session (Generic session type) from the assembled MP4,\n'
+             'then use Tags > Import Tags with its matching Sportscode XML. Notes are written as free text.\n'
+             'XML compatibility: schema-matched, not application-tested. Manual Focus import remains unverified.\n',
+}
+SOURCE_SYNC = {
+    'angles': '',
+    'focus': 'In Focus, align source XML to the full match with Tags > Sync Tags (kick-off timing tag) or Time Offset.\n',
+}
+
 
 def parser():
     p = argparse.ArgumentParser(prog='sportscode-extract')
@@ -33,6 +45,7 @@ def parser():
             for option in ('no-render', 'copy-clips', 'provenance-labels', 'source-xml', 'render-titles', 'allow-partial'):
                 c.add_argument('--' + option, action='store_true')
             c.add_argument('--code-from', choices=('group', 'original'), default='group')
+            c.add_argument('--target', choices=('angles', 'focus'), default='angles')
             c.add_argument('--fps', default='30')
             c.add_argument('--width', type=int, default=1920)
             c.add_argument('--height', type=int, default=1080)
@@ -135,14 +148,14 @@ def extract(args, source, stage, data):
                     shutil.copy2(source / relative, destination)
     mapping = []
     manifest = {'schema_version': 1, 'video': None, 'xml': None,
-                'code_from': args.code_from, 'provenance_labels': args.provenance_labels}
+                'code_from': args.code_from, 'provenance_labels': args.provenance_labels, 'target': args.target}
     if not args.no_render:
         if not ready:
             raise ValueError('No resolved clips available to render')
         mapping, stats = render(source, stage / f'{name}.mp4', ready, args.ffmpeg, args.ffprobe,
                                 args.fps, args.width, args.height, args.drift_tolerance, args.render_titles)
         spans = [(m['output_start'], m['output_end']) for m in mapping if m['kind'] == 'clip']
-        report['row_color_policy'] = write_xml(stage / f'{name}.xml', ready, spans, args.code_from, args.provenance_labels)
+        report['row_color_policy'] = write_xml(stage / f'{name}.xml', ready, spans, args.code_from, args.provenance_labels, args.target)
         report['render'] = stats
         report['xml_validation'] = 'passed'
         report['rendering_fidelity'] = 'normalized H.264/AAC; missing or muted audio filled with silence; editable effects not reproduced'
@@ -153,19 +166,18 @@ def extract(args, source, stage, data):
             raise ValueError('--source-xml requires exactly one original source video')
         destination = stage / 'source' / (safe_name(occurrences[0]['clip'].get('timelineName') or name) + '.xml')
         destination.parent.mkdir()
-        write_xml(destination, ready, [(o['clip']['startTime'], o['clip']['endTime']) for o in ready], args.code_from, args.provenance_labels)
+        write_xml(destination, ready, [(o['clip']['startTime'], o['clip']['endTime']) for o in ready], args.code_from, args.provenance_labels, args.target)
     canonical['report'] = redact(report)
     write_json(metadata / 'playlist.json', canonical)
     write_json(stage / 'reports/source_mapping.json', mapping)
     write_json(stage / 'reports/extraction_report.json', report)
     (stage / 'README.txt').write_text(
-        'Open the assembled MP4 in Angles and import its matching Sportscode XML timeline.\n'
-        'XML compatibility: schema-matched, not application-tested. Manual Angles playback remains unverified.\n'
-        'Timing confidence: ' + report['timing_confidence'] + '.\n'
+        README[args.target] + 'Timing confidence: ' + report['timing_confidence'] + '.\n'
         'Editable visual effects are preserved as metadata but not reproduced in XML/video.\n'
         'metadata/original_metadata contains private, byte-for-byte source JSON and historical paths.\n'
         'Canonical JSON redacts historical absolute path/localPath values; raw copies retain all unknown fields.\n'
         'Source XML uses the original .SCVideo clock, which may not map to a re-encoded full match; angle/segment offsets may apply.\n'
+        + SOURCE_SYNC[args.target] +
         'Omitted clip IDs: ' + json.dumps(report['omitted_clip_ids']) + '\n', encoding='utf-8')
     manifest['files'] = sorted(str(p.relative_to(stage)) for p in stage.rglob('*') if p.is_file())
     write_json(stage / 'manifest.json', manifest)

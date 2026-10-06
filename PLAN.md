@@ -313,6 +313,16 @@ Generate with an XML library (`xml.etree.ElementTree`), UTF-8, with the same sha
 
 `<R>/<G>/<B>` are 8-bit (0–255) integers, as `buildAnglesXml` writes them (e.g. `70/110/180`).
 
+### 12.1b Catapult Focus profile (`--target focus`)
+
+Focus imports Sportscode-style `.xml` (as well as `.json` and `.sctimeline`) through Tags ▸ Import Tags, after an Archive Session has been created from the MP4. `--target focus` changes three things and leaves everything else as in §12.1:
+
+- `moment.note` / `description` go into one `<free_text>` per instance, after `<code>` and joined with a newline. They are not written as `Note` labels. Focus labels are reusable filter values, so a label per unique note would flood the filter list.
+- Rows use the Sportscode-native `<code>` element and 16-bit colour channels (8-bit value × 257).
+- `manifest.json` records `"target": "focus"`, and validation checks free text and rows against that target. Older manifests without the key validate as `angles`.
+
+Source-match XML is lined up in Focus with Sync Tags (kick-off timing tag) or Time Offset. Compatibility stays `schema-matched, not application-tested` until one Focus import is checked. Open questions: does `<free_text>` show as Tag Notes, are row colours applied, and is the `ID` order kept?
+
 ### 12.2 Field mapping (rebased playlist XML)
 
 | Recovered field | XML | Default |

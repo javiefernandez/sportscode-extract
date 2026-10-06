@@ -38,3 +38,24 @@ def test_xml_original_code_and_distinct_colors(tmp_path):
     root=ET.parse(path)
     assert [n.text for n in root.findall('./ALL_INSTANCES/instance/code')]==['original0','original1']
     assert [n.text for n in root.findall('./rows/row/R')]==['0','82']
+
+
+def test_focus_xml_free_text_and_16_bit_rows(tmp_path):
+    clip={'id':'0','startTime':0,'endTime':1,'description':'Same','moment':{'note':'Same','tags':[{'key':'CPA','value':''}]}}
+    occurrences=[{'position':1,'group':{'name':'Goal','color':'#466EB4'},'clip':clip}]
+    path=tmp_path/'focus.xml'
+    write_xml(path,occurrences,[(0,1)],target='focus')
+    root=ET.parse(path)
+    instance=root.find('./ALL_INSTANCES/instance')
+    assert instance.findtext('free_text')=='Same'
+    assert [(n.findtext('group'),n.findtext('text')) for n in instance.findall('label')]==[('Tag','CPA')]
+    assert root.find('./rows/row/Code') is None
+    assert root.findtext('./rows/row/code')=='Goal'
+    assert [root.findtext(f'./rows/row/{k}') for k in ('R','G','B')]==[str(0x46*257),str(0x6E*257),str(0xB4*257)]
+
+
+def test_angles_xml_has_no_free_text(tmp_path):
+    clip={'id':'0','startTime':0,'endTime':1,'description':'Note'}
+    path=tmp_path/'angles.xml'
+    write_xml(path,[{'position':1,'group':{'name':'Goal'},'clip':clip}],[(0,1)])
+    assert ET.parse(path).find('./ALL_INSTANCES/instance/free_text') is None

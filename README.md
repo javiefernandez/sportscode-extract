@@ -33,13 +33,16 @@ The export contains `<playlist>.mp4`, `<playlist>.xml`, `manifest.json`, `README
 
 Open the MP4 in Angles, then import the adjacent Sportscode XML timeline. The group name becomes the code; source match, tags, distinct original row and notes become grouped labels. Identical note/description text appears once. Uniform source colors use a fixed categorical palette.
 
-**Compatibility: schema-matched, not application-tested.** Manual Angles import/playback has not been performed. Check clip boundaries, grouped labels and row colors in Angles before relying on application compatibility. Timing confidence is **media-consistent**, not playback-verified.
+For **Catapult Focus**, extract with `--target focus`. In Focus, create an Archive Session from the MP4 (Generic session type), then choose Tags ▸ Import Tags and select the XML. The assembled timeline starts at zero, so no sync is needed. The Focus profile writes notes and descriptions as one `<free_text>` per instance, not as `Note` labels, so the Focus label filter isn't flooded with one-off notes. Rows use the Sportscode-native `<code>` with 16-bit (0–65535) colour channels. The default `--target angles` output is unchanged. To use `--source-xml` against your own full-match recording in Focus, line it up with Tags ▸ Sync Tags (kick-off timing tag) or the Tag Properties Time Offset.
+
+**Compatibility: schema-matched, not application-tested.** Manual Angles and Focus import/playback has not been performed. Check clip boundaries, grouped labels, notes and row colors in the target application before relying on application compatibility. Timing confidence is **media-consistent**, not playback-verified.
 
 Useful extraction options:
 
 - `--no-render`: metadata and referenced original media only.
 - `--copy-clips`: also retain referenced original media with the rendered pair.
 - `--source-xml`: original-clock XML, available only for a single source video. These times use the original `.SCVideo` clock; they may differ from a re-encoded full-match file, and angle/segment offsets may apply.
+- `--target focus`: Catapult Focus XML profile (free-text notes, Sportscode-native rows); default `angles`.
 - `--code-from original`: use the original coding row instead of playlist group.
 - `--provenance-labels`: include UUID/order/original-time XML labels.
 - `--render-titles`: insert two-second plain group title cards. Editable source effects remain metadata only.

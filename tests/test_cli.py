@@ -55,6 +55,29 @@ def test_render_xml_and_validate(package_factory,tmp_path,ffmpeg,ffprobe):
     assert result.returncode==1
 
 
+def test_focus_target_free_text_rows_and_validate(package_factory,tmp_path,ffmpeg,ffprobe):
+    package=package_factory(second=True)
+    output=tmp_path/'export'
+    result=cli('extract',package,'--output',output,'--target','focus',ffmpeg=ffmpeg,ffprobe=ffprobe)
+    assert result.returncode==0,result.stderr+result.stdout
+    xml,=output.glob('*.xml')
+    root=ET.parse(xml).getroot()
+    for instance in root.findall('./ALL_INSTANCES/instance'):
+        assert instance.findtext('free_text')=='A & B <note>'
+        assert not any(n.findtext('group')=='Note' for n in instance.findall('label'))
+    rows=root.findall('./rows/row')
+    assert all(row.findtext('code') and row.find('Code') is None for row in rows)
+    assert all(0<=int(row.findtext(k))<=65535 for row in rows for k in ('R','G','B'))
+    assert json.loads((output/'manifest.json').read_text())['target']=='focus'
+    assert 'Catapult Focus' in (output/'README.txt').read_text()
+    assert cli('validate',output,ffmpeg=ffmpeg,ffprobe=ffprobe).returncode==0
+    tree=ET.parse(xml)
+    tree.find('./ALL_INSTANCES/instance/free_text').text='Wrong note'
+    tree.write(xml,encoding='utf-8',xml_declaration=True)
+    result=cli('validate',output,ffmpeg=ffmpeg,ffprobe=ffprobe)
+    assert result.returncode==1 and 'Free text differs at instance 1' in result.stdout,result.stderr+result.stdout
+
+
 def test_dry_run_and_no_render_copy(package_factory,tmp_path,ffmpeg,ffprobe):
     package=package_factory()
     output=tmp_path/'export'

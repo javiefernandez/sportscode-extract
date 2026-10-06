@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from .media import probe, duration
-from .export_xml import labels
+from .export_xml import ROWS, labels, notes
 
 
 def validate_export(directory, ffprobe=None):
@@ -19,6 +19,11 @@ def validate_export(directory, ffprobe=None):
     canonical = load('metadata/playlist.json')
     mapping = load('reports/source_mapping.json')
     errors = []
+    # Exports written before --target existed are Angles exports.
+    target = manifest.get('target', 'angles')
+    if target not in ROWS:
+        raise ValueError(f'Unknown export target: {target}')
+    row_key, scale = ROWS[target]
     def artifact(name):
         path = root / name
         if not path.resolve().is_relative_to(root) or not path.is_file():
@@ -66,10 +71,13 @@ def validate_export(directory, ffprobe=None):
             if abs(start - span['output_start']) > .001 or abs(end - span['output_end']) > .001:
                 errors.append(f'Mapping differs at instance {index}')
             code = occurrence['group']['name'] if manifest['code_from'] == 'group' else occurrence['clip'].get('originalGroupName', occurrence['group']['name'])
-            expected = labels(occurrence['clip'], code, occurrence['position'], manifest['provenance_labels'])
+            expected = labels(occurrence['clip'], code, occurrence['position'], manifest['provenance_labels'], target == 'angles')
             actual = [(n.findtext('group') or '', n.findtext('text') or '') for n in node.findall('label')]
             if node.findtext('code') != code or actual != expected:
                 errors.append(f'Code or labels differ at instance {index}')
+            free_text = '\n'.join(notes(occurrence['clip'])) if target == 'focus' else ''
+            if (node.findtext('free_text') or '') != free_text:
+                errors.append(f'Free text differs at instance {index}')
             if abs(span['actual_duration'] - span['requested_duration']) > .05:
                 errors.append(f'Clip duration drift at instance {index}')
         if mapping and abs(mapping[-1]['output_end'] - video_duration) > .1:
@@ -78,7 +86,7 @@ def validate_export(directory, ffprobe=None):
         if name.endswith('.xml'):
             tree = ET.parse(artifact(name))
             for row in tree.findall('./rows/row'):
-                if not row.findtext('Code') or any(not 0 <= int(row.findtext(k)) <= 255 for k in ('R', 'G', 'B')):
+                if not row.findtext(row_key) or any(not 0 <= int(row.findtext(k)) <= 255 * scale for k in ('R', 'G', 'B')):
                     errors.append(f'Invalid XML row: {name}')
             if tree.getroot().tag != 'file' or tree.find('ALL_INSTANCES') is None or tree.find('rows') is None:
                 errors.append(f'Invalid XML structure: {name}')
