@@ -51,7 +51,16 @@ install_macos() {
     ok "Homebrew $(brew --version | head -1 | awk '{print $2}')"
 
     step "Installing Python 3.12 and FFmpeg via Homebrew"
-    brew install python@3.12 ffmpeg
+    brew install python@3.12
+    # Core Homebrew ffmpeg is built without freetype, so it lacks the drawtext
+    # filter used by --render-titles. The homebrew-ffmpeg tap includes it.
+    if brew list --formula --full-name | grep -qx ffmpeg; then
+        echo "  Replacing core Homebrew ffmpeg (no drawtext) with homebrew-ffmpeg/ffmpeg..."
+        brew uninstall --ignore-dependencies ffmpeg
+    fi
+    brew tap homebrew-ffmpeg/ffmpeg
+    echo "  Installing homebrew-ffmpeg/ffmpeg (may build from source; can take a while)..."
+    brew install homebrew-ffmpeg/ffmpeg/ffmpeg
     ok "Homebrew packages installed"
 }
 
@@ -108,7 +117,9 @@ DECODERS="$(ffmpeg -hide_banner -decoders 2>/dev/null)"
 echo "$ENCODERS" | grep -qw libx264 || die "ffmpeg lacks libx264 encoder"
 echo "$ENCODERS" | grep -qE ' aac '  || die "ffmpeg lacks AAC encoder"
 echo "$DECODERS" | grep -qw hevc    || die "ffmpeg lacks HEVC decoder"
-ok "$(ffmpeg -version | head -1) — libx264, aac, hevc OK"
+ffmpeg -hide_banner -filters 2>/dev/null | grep -qw drawtext \
+    || die "ffmpeg lacks the drawtext filter (needs libfreetype) — $(command -v ffmpeg)"
+ok "$(ffmpeg -version | head -1) — libx264, aac, hevc, drawtext OK"
 
 # --- Tests -----------------------------------------------------------------
 

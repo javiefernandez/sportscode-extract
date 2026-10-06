@@ -6,7 +6,7 @@ Export **exactly one** `.SCPlaylist` package as an assembled H.264/AAC MP4 and a
 
 ```bash
 git clone https://github.com/javiefernandez/sportscode-extract.git && cd sportscode-extract
-./setup.sh   # installs Homebrew, Python 3.12, FFmpeg; creates .venv; runs tests
+./setup.sh   # installs Homebrew, Python 3.12, FFmpeg (homebrew-ffmpeg tap); creates .venv; runs tests
 ./run.sh     # drag a .SCPlaylist into the window; exports to local_exports/<name>
 ```
 
