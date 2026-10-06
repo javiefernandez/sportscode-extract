@@ -60,6 +60,7 @@ button:disabled { opacity:.5; cursor:default; }
   <div class="opts">
     <label><input type="checkbox" id="force"> Overwrite existing export</label>
     <label><input type="checkbox" id="partial"> Allow partial (skip unusable clips)</label>
+    <label title="Keeps clips whose video file is shorter or longer than Sportscode's metadata says; short files are cut at their end."><input type="checkbox" id="lenient" checked> Lenient timing (keep clips with duration mismatches)</label>
   </div>
   <p class="small" id="preview"></p>
   <button id="go">Extract</button>
@@ -84,7 +85,7 @@ $('path').oninput = $('dest').oninput = preview;
 $('pick').onclick = async () => { const r = await api('/api/pick', {kind: 'playlist'}); if (r.path) { $('path').value = r.path; preview(); } };
 $('pickdest').onclick = async () => { const r = await api('/api/pick', {kind: 'folder'}); if (r.path) { $('dest').value = r.path; preview(); } };
 $('go').onclick = async () => {
-  const r = await api('/api/run', {playlist: $('path').value.trim(), dest: $('dest').value.trim(), target, force: $('force').checked, allow_partial: $('partial').checked});
+  const r = await api('/api/run', {playlist: $('path').value.trim(), dest: $('dest').value.trim(), target, force: $('force').checked, allow_partial: $('partial').checked, lenient: $('lenient').checked});
   if (r.error) return show('bad', 'Could not start', esc(r.error));
   poll();
 };
@@ -99,10 +100,10 @@ async function poll() {
     const kind = s.code === 0 ? 'ok' : s.code === 2 ? 'warn' : 'bad';
     const title = s.code === 0 ? 'Export complete' : s.code === 2 ? 'Export partial — some clips skipped' : 'Export failed';
     let html = s.output_exists ? `<p><code>${esc(s.output)}</code></p><button id="open">Open folder</button>` : '';
-    if (s.clips != null) html = `<p>${s.clips} clips in playlist${s.omitted ? `, ${s.omitted} skipped` : ''}.</p>` + html;
+    if (s.clips != null) html = `<p>${s.clips} clips in playlist${s.omitted ? `, ${s.omitted} skipped` : ''}${s.lenient ? `, ${s.lenient} kept with lenient timing` : ''}.</p>` + html;
     if (s.issues && s.issues.length) html += '<ul>' + s.issues.map(([m, n]) => `<li>${n} × ${esc(m)}</li>`).join('') + '</ul>';
     if (s.error) html += `<p>${esc(s.error)}</p>`;
-    if (s.code === 1 && /allow-partial/.test(s.error || '')) html += '<p class="small">Tick “Allow partial” to export the usable clips anyway.</p>';
+    if (s.code === 1 && /allow-partial/.test(s.error || '')) html += '<p class="small">Tick “Allow partial” to export the usable clips anyway' + ($('lenient').checked ? '' : ', or “Lenient timing” to keep clips with duration mismatches') + '.</p>';
     if (s.code === 1 && /already exists/.test(s.error || '')) html += '<p class="small">Tick “Overwrite existing export” to replace it.</p>';
     show(kind, title, html);
     if ($('open')) $('open').onclick = () => api('/api/open', {});
@@ -126,7 +127,7 @@ class App:
         self.lock = threading.Lock()
         self.last_seen = time.time()
 
-    def start(self, playlist, target, force, allow_partial, dest=None):
+    def start(self, playlist, target, force, allow_partial, dest=None, lenient=False):
         source = Path(playlist).expanduser()
         if source.suffix.lower() != '.scplaylist' or not source.is_dir():
             raise ValueError('Choose an existing .SCPlaylist package')
@@ -138,7 +139,7 @@ class App:
         # Each export gets its own subfolder named after the playlist.
         output = dest / (source.stem + (' (Focus)' if target == 'focus' else ''))
         command = [sys.executable, '-m', 'sportscode_extract', 'extract', str(source), '--output', str(output), '--target', target]
-        command += ['--force'] * bool(force) + ['--allow-partial'] * bool(allow_partial)
+        command += ['--force'] * bool(force) + ['--allow-partial'] * bool(allow_partial) + ['--lenient-timing'] * bool(lenient)
         with self.lock:
             if self.job['state'] == 'running':
                 raise ValueError('An extraction is already running')
@@ -158,6 +159,7 @@ class App:
             report = json.loads(result.stdout)
             job['clips'] = report['counts']['media_clips']
             job['omitted'] = len(report.get('omitted_clip_ids', []))
+            job['lenient'] = report['counts'].get('lenient_timing_clips', 0)
             job['issues'] = Counter(i['message'] for i in report['issues']).most_common(8)
         except (ValueError, KeyError, TypeError):
             pass
@@ -247,7 +249,7 @@ def handler(app):
             elif self.path == '/api/run':
                 try:
                     app.start(body.get('playlist', ''), body.get('target', 'angles'), body.get('force'),
-                              body.get('allow_partial'), body.get('dest'))
+                              body.get('allow_partial'), body.get('dest'), body.get('lenient'))
                     self.send({'ok': True})
                 except ValueError as exc:
                     self.send({'error': str(exc)})

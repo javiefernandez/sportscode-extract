@@ -263,3 +263,16 @@ def test_partial_reports_ungrouped_media(package_factory,tmp_path,ffmpeg,ffprobe
     assert result.returncode==2,result.stderr+result.stdout
     report=json.loads((output/'reports'/'extraction_report.json').read_text())
     assert 'clip0' in report['omitted_clip_ids']
+
+
+def test_lenient_timing_extracts_mismatched_clip(package_factory,tmp_path,ffmpeg,ffprobe):
+    package=package_factory()
+    mutate(package,lambda p:[(c.update(endTime=11.5),c['moment'].update(endTime=11.5)) for c in p['clips'] if c.get('moment')])
+    output=tmp_path/'export'
+    strict=cli('extract',package,'--output',output,ffmpeg=ffmpeg,ffprobe=ffprobe)
+    assert strict.returncode==1 and 'allow-partial' in strict.stderr
+    result=cli('extract',package,'--output',output,'--lenient-timing',ffmpeg=ffmpeg,ffprobe=ffprobe)
+    assert result.returncode==0,result.stderr+result.stdout
+    report=json.loads(result.stdout)
+    assert report['counts']['lenient_timing_clips']==1 and report['timing_confidence']=='lenient'
+    assert report['omitted_clip_ids']==[]

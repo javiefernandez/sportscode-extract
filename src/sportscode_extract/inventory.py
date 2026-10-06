@@ -28,7 +28,7 @@ def read(path):
         return json.load(handle)
 
 
-def inspect_package(path, ffprobe=None, tolerance=0.02, timing_config=None):
+def inspect_package(path, ffprobe=None, tolerance=0.02, timing_config=None, lenient=False):
     root = Path(path).resolve()
     if not root.is_dir() or root.suffix.lower() != '.scplaylist':
         raise ValueError('Expected exactly one .SCPlaylist directory')
@@ -141,11 +141,12 @@ def inspect_package(path, ffprobe=None, tolerance=0.02, timing_config=None):
                 if len(stream['files']) != 1 or stream['segment_resolution'] in ('ambiguous', 'unresolved'):
                     issue('unsupported_segments', f'Stream {stream["id"]}: {stream["segment_resolution"]}; multi-segment rendering unsupported', clip_id)
                     continue
-                timing = check(clip, duration(stream['probe']), tolerance, (timing_config or {}).get(clip_id))
+                timing = check(clip, duration(stream['probe']), tolerance, (timing_config or {}).get(clip_id), lenient)
                 stream['timing'] = timing
                 stream['source_spans'][0].update(local_start=timing['local_start'], local_end=timing['local_end'])
                 if timing['timing_status'] != 'resolved':
-                    issue('timing_unresolved', f'Duration check failed for stream {stream["id"]}', clip_id)
+                    issue('timing_unresolved', f'Duration check failed for stream {stream["id"]}: file {duration(stream["probe"]):.3f}s, '
+                          f'clip needs {timing["local_end"]:.3f}s', clip_id)
             selected = clip.get('streamIds', [])
             if len(selected) != 1 or not selected[0] or clip.get('audioStreamIds') != selected:
                 issue('unsupported_stream_selection', 'Exactly one matching visual/audio stream selection is required', clip_id)
@@ -189,11 +190,12 @@ def inspect_package(path, ffprobe=None, tolerance=0.02, timing_config=None):
                   effects=len(effects), orphaned_effects=len(orphaned),
                   tags=sum(len(c.get('moment', {}).get('tags', [])) for c in media_clips),
                   clips_with_notes=sum(bool(c.get('moment', {}).get('note') or c.get('description')) for c in media_clips),
-                  selected_streams_without_audio=sum(bool(o['selected_stream'] and o['selected_stream'].get('probe') and not has_audio(o['selected_stream']['probe'])) for o in occurrences))
+                  selected_streams_without_audio=sum(bool(o['selected_stream'] and o['selected_stream'].get('probe') and not has_audio(o['selected_stream']['probe'])) for o in occurrences),
+                  lenient_timing_clips=sum(o.get('timing_confidence') == 'lenient' for o in occurrences))
     report = {'status': 'partial' if issues else 'complete', 'counts': counts, 'issues': issues, 'invariants': invariants,
               'unreferenced_media': sorted(unreferenced, key=lambda x: str(x['video_id'])), 'orphaned_effects': orphaned,
               'metadata_completeness': 'partial' if issues else 'complete', 'media_availability': 'partial' if any(o['timing_status'] != 'resolved' for o in occurrences) else 'complete',
-              'timing_confidence': 'media-consistent' if invariants['timing_rule_holds'] else 'explicit-policy' if stream_entries and all(s.get('timing', {}).get('timing_status') == 'resolved' for s in stream_entries) else 'unresolved',
+              'timing_confidence': 'media-consistent' if invariants['timing_rule_holds'] else ('lenient' if any(s.get('timing', {}).get('timing_confidence') == 'lenient' for s in stream_entries) else 'explicit-policy') if stream_entries and all(s.get('timing', {}).get('timing_status') == 'resolved' for s in stream_entries) else 'unresolved',
               'xml_validation': 'not generated', 'application_compatibility': 'schema-matched, not application-tested',
               'rendering_fidelity': 'not rendered; editable effects are not reproduced in XML'}
     return {'schema_version': 1, 'playlist': document, 'occurrences': occurrences, 'streams': stream_entries, 'report': report}

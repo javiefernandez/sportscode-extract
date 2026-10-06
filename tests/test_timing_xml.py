@@ -59,3 +59,16 @@ def test_angles_xml_has_no_free_text(tmp_path):
     path=tmp_path/'angles.xml'
     write_xml(path,[{'position':1,'group':{'name':'Goal'},'clip':clip}],[(0,1)])
     assert ET.parse(path).find('./ALL_INSTANCES/instance/free_text') is None
+
+
+def test_lenient_timing_keeps_mismatched_clips():
+    clip={'startTimeOffset':0.5,'startTime':0,'endTime':2}
+    assert check(clip,4)['timing_status']=='timing_unresolved'
+    longer=check(clip,4,lenient=True)
+    assert (longer['timing_status'],longer['timing_confidence'],longer['local_end'])==('resolved','lenient',2.5)
+    shorter=check(clip,1.5,lenient=True)
+    assert (shorter['timing_status'],shorter['local_start'],shorter['local_end'])==('resolved',0.5,1.5)
+    assert 'clamped' in shorter['timing_rule']
+    assert check(clip,0.4,lenient=True)['timing_status']=='timing_unresolved'
+    assert check({'startTimeOffset':-0.1,'startTime':0,'endTime':1},2,lenient=True)['timing_status']=='timing_unresolved'
+    assert check(clip,2.5,lenient=True)['timing_confidence']=='media-consistent'

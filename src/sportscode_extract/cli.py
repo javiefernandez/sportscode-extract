@@ -39,6 +39,8 @@ def parser():
         c.add_argument('--force', action='store_true')
         c.add_argument('--timing-config', type=Path)
         c.add_argument('--timing-tolerance', type=float, default=.02)
+        c.add_argument('--lenient-timing', action='store_true',
+                       help='keep clips whose file duration does not match the metadata (end clamped to the file)')
         c.add_argument('--dry-run', action='store_true')
         if command == 'extract':
             c.add_argument('--ffmpeg')
@@ -197,7 +199,7 @@ def main(argv=None):
             source = args.path.resolve()
             output = check_output(source, args.output, args.force) if args.output else None
             config = json.loads(args.timing_config.read_text()) if args.timing_config else None
-            data = inspect_package(source, args.ffprobe, args.timing_tolerance, config)
+            data = inspect_package(source, args.ffprobe, args.timing_tolerance, config, args.lenient_timing)
             report = data['report']
             if not args.dry_run and output:
                 output.parent.mkdir(parents=True, exist_ok=True)

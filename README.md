@@ -52,6 +52,7 @@ Useful extraction options:
 - `--fps 30000/1001`, `--width 1920`, `--height 1080`: output profile (default 30 fps, 1920×1080, letterboxed).
 - `--dry-run`: inspect and report without writing an export.
 - `--allow-partial`: explicitly permit omissions; all omitted IDs appear in the report and export README.
+- `--lenient-timing`: keep clips whose file duration doesn't match the metadata instead of skipping them. The clip interval is used as-is, or ends at the file's end when the file is short; clips that start past the end of their file are still skipped. Kept clips count in `lenient_timing_clips` and set timing confidence to `lenient`. On by default in the front end.
 
 The default local interval is `startTimeOffset` through `startTimeOffset + endTime - startTime`. Actual media duration must match its end within 0.02 seconds, with valid bounds. Segment offsets are provenance, not added to this interval. Multiple selected streams and unsupported multi-segment footage are reported. `--timing-config FILE` accepts a JSON object keyed by clip UUID, each value containing numeric `local_start` and `local_end`; this is explicitly reported as an override. `--timing-tolerance` controls input checks and `--drift-tolerance` controls total rendered drift (default 0.1 seconds). XML times come from probed rendered spans, not requested durations. Missing/muted audio gets silence; all rendered clips use a shared frame clock.
 
