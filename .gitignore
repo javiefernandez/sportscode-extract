@@ -11,3 +11,4 @@ dist/
 .sportscode-stage-*/
 .sportscode-backup-*/
 .DS_Store
+graphify-out/
