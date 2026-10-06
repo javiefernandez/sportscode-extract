@@ -7,8 +7,11 @@ Export **exactly one** `.SCPlaylist` package as an assembled H.264/AAC MP4 and a
 ```bash
 git clone https://github.com/javiefernandez/sportscode-extract.git && cd sportscode-extract
 ./setup.sh   # installs Homebrew, Python 3.12, FFmpeg (homebrew-ffmpeg tap); creates .venv; runs tests
-./run.sh     # drag a .SCPlaylist into the window; exports to local_exports/<name>
+./run.sh gui # opens the front end in your browser (macOS: double-click 'Sportscode Extract.app')
+./run.sh     # terminal version: drag a .SCPlaylist into the window; exports to local_exports/<name>
 ```
+
+The front end is a local page (only reachable from this computer): choose a playlist and a Save to folder (default `local_exports/`, remembered between launches), pick Angles or Catapult Focus, and press Extract. Each export goes into its own subfolder named after the playlist (`<Save to>/<playlist>`, or `<playlist> (Focus)`). It shuts itself down two minutes after the page is closed.
 
 `setup.sh` supports macOS (Homebrew) and Debian/Ubuntu (apt), is safe to re-run, and accepts `--skip-tests`. `./run.sh <inspect|extract|validate> ...` passes arguments straight to the CLI.
 

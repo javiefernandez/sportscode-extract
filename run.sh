@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run sportscode-extract from the project's .venv (created by ./setup.sh).
 #
+#   ./run.sh gui                   opens the web front end in your browser
 #   ./run.sh                       interactive: asks for a playlist, extracts, validates
 #   ./run.sh <subcommand> [args]   passes everything to the CLI (inspect/extract/validate)
 set -euo pipefail
@@ -15,6 +16,10 @@ for b in /opt/homebrew/bin /usr/local/bin; do
 done
 export PATH
 
+if [ "${1:-}" = gui ]; then
+    shift
+    exec "$ROOT/.venv/bin/python" -m sportscode_extract.gui --exports "$ROOT/local_exports" "$@"
+fi
 if [ $# -gt 0 ]; then
     exec "$CLI" "$@"
 fi

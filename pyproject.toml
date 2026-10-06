@@ -11,7 +11,10 @@ dependencies = []
 test = ["pytest>=7"]
 [project.scripts]
 sportscode-extract = "sportscode_extract.cli:main"
+sportscode-extract-gui = "sportscode_extract.gui:main"
 [tool.setuptools.packages.find]
 where = ["src"]
+[tool.setuptools.package-data]
+sportscode_extract = ["static/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]

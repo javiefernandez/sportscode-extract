@@ -12,3 +12,4 @@ dist/
 .sportscode-backup-*/
 .DS_Store
 graphify-out/
+Sportscode Extract.app/
