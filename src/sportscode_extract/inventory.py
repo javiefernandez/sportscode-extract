@@ -79,21 +79,25 @@ def inspect_package(path, ffprobe=None, tolerance=0.02, timing_config=None):
                 if clip.get('videoId') == local_id:
                     issue('video_id_mismatch', f'video.json ID mismatch for {local_id}', clip['id'])
             continue
+        def stream_issue(kind, message, stream_ids):
+            # Only clips selecting a bad stream are affected; an unused bad stream stays a package-level issue.
+            users = [c for c in media_clips if c.get('videoId') == local_id
+                     and set(c.get('streamIds', []) + c.get('audioStreamIds', [])) & stream_ids]
+            for clip in users:
+                issue(kind, message, clip['id'])
+            if not users:
+                issue(kind, f'{message} (video {local_id}; no clip selects it)')
         metadata_files = [p for p in paths if p.name == 'stream.json' and p.is_relative_to(directory)]
         discovered_ids = {read(p).get('id') for p in metadata_files}
         declared_ids = {s.get('id') for item in (record, video_metadata) for s in item.get('streams', [])}
         if declared_ids - discovered_ids:
-            for clip in media_clips:
-                if clip.get('videoId') == local_id:
-                    issue('unresolved_reference', 'Declared stream metadata is missing from its video folder', clip['id'])
+            stream_issue('unresolved_reference', 'Declared stream metadata is missing from its video folder', declared_ids - discovered_ids)
         for metadata in metadata_files:
             stream = read(metadata)
             # Re-exported videos can leave video.json "streams" empty; treat that as undeclared.
             declarations = [item['streams'] for item in (record, video_metadata) if item.get('streams')]
             if any(sum(s.get('id') == stream.get('id') for s in declared) != 1 for declared in declarations):
-                for clip in media_clips:
-                    if clip.get('videoId') == local_id:
-                        issue('stream_id_mismatch', 'Stream ID is absent or ambiguous in its video metadata', clip['id'])
+                stream_issue('stream_id_mismatch', 'Stream ID is absent or ambiguous in its video metadata', {stream.get('id')})
                 continue
             present = sorted(p for p in paths if p.parent == metadata.parent and p.suffix.lower() in MEDIA)
             listed = [s.get('fileName') for s in stream.get('segments', [])]

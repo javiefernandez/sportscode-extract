@@ -157,4 +157,17 @@ def test_missing_unselected_declared_stream_is_reported(package_factory, ffprobe
     mutate(package,lambda p:p['videos'][0]['streams'].append({'id':'missing-unselected'}))
     result=inspect_package(package,ffprobe=ffprobe)
     assert result['report']['status']!='complete'
-    assert any(issue['kind']=='unresolved_reference' for issue in result['report']['issues'])
+    assert [issue['clip_id'] for issue in result['report']['issues'] if issue['kind']=='unresolved_reference']==[None]
+    assert result['occurrences'][0]['selected_stream']['id']=='stream0'
+
+
+def test_bad_unselected_stream_keeps_other_clips(package_factory, ffprobe):
+    package=package_factory()
+    extra=package/'Videos'/'clip0'/'Stream_0001'
+    shutil.copytree(package/'Videos'/'clip0'/'Stream_0000',extra)
+    (extra/'stream.json').write_text(json.dumps({'id':'undeclared-angle','name':'Angle 2','segments':[]}))
+    result=inspect_package(package,ffprobe=ffprobe)
+    issues=[issue for issue in result['report']['issues'] if issue['kind']=='stream_id_mismatch']
+    assert result['report']['status']=='partial'
+    assert [issue['clip_id'] for issue in issues]==[None]
+    assert result['occurrences'][0]['selected_stream']['id']=='stream0'
