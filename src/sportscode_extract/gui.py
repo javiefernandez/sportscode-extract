@@ -185,7 +185,10 @@ class App:
 
 # .SCPlaylist is a package (a file) where Sportscode is installed and a plain folder elsewhere,
 # so the panel must accept both; AppleScript's choose file/choose folder each accept only one.
+# osascript is a background process, so its panel opens behind the browser unless it first
+# becomes a regular (foreground) app and activates itself.
 PICKER = '''ObjC.import('AppKit');
+$.NSApplication.sharedApplication.setActivationPolicy($.NSApplicationActivationPolicyRegular);
 $.NSApplication.sharedApplication.activateIgnoringOtherApps(true);
 var p = $.NSOpenPanel.openPanel;
 p.canChooseFiles = FILES; p.canChooseDirectories = true; p.canCreateDirectories = !FILES; p.allowsMultipleSelection = false;
