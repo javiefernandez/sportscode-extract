@@ -114,26 +114,22 @@ make_app() {
     local app="$ROOT/Sportscode Extract.app" icon="$ROOT/src/sportscode_extract/static/icon.png"
     local iconset="$ROOT/.tmp/icon.iconset" size
     rm -rf "$app" "$iconset"
-    mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$iconset"
+    # An AppleScript applet, not a bare shell-script bundle: recent macOS refuses to
+    # launch those (error -10810). The applet starts the server in the background and quits.
+    osacompile -o "$app" \
+        -e "set root to \"$ROOT\"" \
+        -e 'do shell script "nohup " & quoted form of (root & "/run.sh") & " gui >> " & quoted form of (root & "/.tmp/gui.log") & " 2>&1 &"'
+    mkdir -p "$iconset"
     for size in 16 32 128 256 512; do
         sips -z "$size" "$size" "$icon" --out "$iconset/icon_${size}x${size}.png" >/dev/null
         sips -z $((size * 2)) $((size * 2)) "$icon" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
     done
-    iconutil -c icns "$iconset" -o "$app/Contents/Resources/icon.icns"
-    cat > "$app/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-    <key>CFBundleName</key><string>Sportscode Extract</string>
-    <key>CFBundleIdentifier</key><string>local.sportscode-extract</string>
-    <key>CFBundleExecutable</key><string>launch</string>
-    <key>CFBundleIconFile</key><string>icon</string>
-    <key>CFBundlePackageType</key><string>APPL</string>
-</dict></plist>
-PLIST
-    # The repo path is baked in so the app can be moved to the Dock or /Applications.
-    printf '#!/bin/bash\nROOT=%q\nnohup "$ROOT/run.sh" gui >>"$ROOT/.tmp/gui.log" 2>&1 &\n' "$ROOT" > "$app/Contents/MacOS/launch"
-    chmod +x "$app/Contents/MacOS/launch"
+    iconutil -c icns "$iconset" -o "$app/Contents/Resources/applet.icns"
+    # Drop the asset catalog so macOS uses applet.icns (the photo) instead of the default icon.
+    rm -f "$app/Contents/Resources/Assets.car"
+    plutil -remove CFBundleIconName "$app/Contents/Info.plist" 2>/dev/null || true
+    plutil -replace CFBundleIdentifier -string local.sportscode-extract "$app/Contents/Info.plist"
+    codesign --force --deep --sign - "$app" 2>/dev/null
     touch "$app"  # refresh Finder's icon cache
     ok "Double-click 'Sportscode Extract.app' to open the front end"
 }
