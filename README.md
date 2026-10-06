@@ -2,6 +2,18 @@
 
 Export **exactly one** `.SCPlaylist` package as an assembled H.264/AAC MP4 and a Sportscode XML timeline, ordered by playlist group and clip order. Python 3.10+; standard library runtime. Install from this repository, which is not published on PyPI.
 
+## Quick start (new laptop)
+
+```bash
+git clone https://github.com/javiefernandez/sportscode-extract.git && cd sportscode-extract
+./setup.sh   # installs Homebrew, Python 3.12, FFmpeg; creates .venv; runs tests
+./run.sh     # drag a .SCPlaylist into the window; exports to local_exports/<name>
+```
+
+`setup.sh` supports macOS (Homebrew) and Debian/Ubuntu (apt), is safe to re-run, and accepts `--skip-tests`. `./run.sh <inspect|extract|validate> ...` passes arguments straight to the CLI.
+
+## Manual setup
+
 ```bash
 /Users/javierfernandez/miniconda3/envs/football-pipeline/bin/python -m venv .venv
 source .venv/bin/activate

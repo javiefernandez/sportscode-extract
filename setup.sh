@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# One-shot setup for a fresh machine: installs Python 3.10+ and FFmpeg,
+# creates .venv, installs sportscode-extract, checks FFmpeg codecs and runs
+# the test suite. Safe to re-run.
+#
+#   ./setup.sh              full setup
+#   ./setup.sh --skip-tests skip pytest at the end
+#
+# Supports macOS (Homebrew) and Debian/Ubuntu (apt). Written for bash 3.2.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+RUN_TESTS=1
+for arg in "$@"; do
+    case "$arg" in
+        --skip-tests) RUN_TESTS=0 ;;
+        -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+        *) echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
+step() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+ok()   { printf '\033[1;32m  ✓ %s\033[0m\n' "$*"; }
+die()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; exit 1; }
+
+# --- System packages -------------------------------------------------------
+
+load_brew() {
+    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [ -x "$b" ]; then eval "$("$b" shellenv)"; return 0; fi
+    done
+    command -v brew >/dev/null 2>&1
+}
+
+install_macos() {
+    step "Checking Xcode Command Line Tools"
+    if ! xcode-select -p >/dev/null 2>&1; then
+        xcode-select --install || true
+        die "Finish the Command Line Tools installer window, then re-run ./setup.sh"
+    fi
+    ok "Command Line Tools present"
+
+    step "Checking Homebrew"
+    if ! load_brew; then
+        echo "  Installing Homebrew (you may be asked for your password)..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        load_brew || die "Homebrew installed but brew not found; open a new terminal and re-run"
+    fi
+    ok "Homebrew $(brew --version | head -1 | awk '{print $2}')"
+
+    step "Installing Python 3.12 and FFmpeg via Homebrew"
+    brew install python@3.12 ffmpeg
+    ok "Homebrew packages installed"
+}
+
+install_linux() {
+    command -v apt-get >/dev/null 2>&1 || die "Only apt-based Linux is automated. Install Python 3.10+ and FFmpeg (libx264, aac) manually, then re-run."
+    step "Installing Python and FFmpeg via apt (sudo required)"
+    sudo apt-get update
+    sudo apt-get install -y python3 python3-venv python3-pip ffmpeg
+    ok "apt packages installed"
+}
+
+case "$(uname -s)" in
+    Darwin) install_macos ;;
+    Linux)  install_linux ;;
+    *)      die "Unsupported OS: $(uname -s)" ;;
+esac
+
+# --- Python environment ----------------------------------------------------
+
+py_ok() { "$1" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; }
+
+step "Locating Python 3.10+"
+PYTHON=""
+for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v "$candidate" >/dev/null 2>&1 && py_ok "$candidate"; then
+        PYTHON="$(command -v "$candidate")"; break
+    fi
+done
+[ -n "$PYTHON" ] || die "No Python 3.10+ found on PATH"
+ok "$PYTHON ($("$PYTHON" --version 2>&1))"
+
+step "Creating virtual environment (.venv)"
+if [ -x .venv/bin/python ] && py_ok .venv/bin/python; then
+    ok "Reusing existing .venv"
+else
+    rm -rf .venv
+    "$PYTHON" -m venv .venv
+    ok "Created .venv"
+fi
+
+step "Installing sportscode-extract"
+mkdir -p .tmp local_exports
+.venv/bin/python -m pip install --quiet --upgrade pip
+.venv/bin/python -m pip install --quiet -e '.[test]'
+ok "$(.venv/bin/sportscode-extract --help >/dev/null && echo 'sportscode-extract command installed')"
+
+# --- FFmpeg capability check -----------------------------------------------
+
+step "Verifying FFmpeg codecs"
+command -v ffmpeg  >/dev/null 2>&1 || die "ffmpeg not on PATH"
+command -v ffprobe >/dev/null 2>&1 || die "ffprobe not on PATH"
+ENCODERS="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
+DECODERS="$(ffmpeg -hide_banner -decoders 2>/dev/null)"
+echo "$ENCODERS" | grep -qw libx264 || die "ffmpeg lacks libx264 encoder"
+echo "$ENCODERS" | grep -qE ' aac '  || die "ffmpeg lacks AAC encoder"
+echo "$DECODERS" | grep -qw hevc    || die "ffmpeg lacks HEVC decoder"
+ok "$(ffmpeg -version | head -1) — libx264, aac, hevc OK"
+
+# --- Tests -----------------------------------------------------------------
+
+if [ "$RUN_TESTS" = 1 ]; then
+    step "Running test suite"
+    .venv/bin/python -m pytest -q --basetemp=.tmp/pytest || die "Tests failed — see output above"
+    ok "Tests passed"
+fi
+
+chmod +x "$ROOT/run.sh"
+step "Setup complete"
+cat <<EOF
+  Run interactively (prompts for the playlist):
+      ./run.sh
+
+  Or call the CLI directly:
+      ./run.sh inspect  '/path/One.SCPlaylist'
+      ./run.sh extract  '/path/One.SCPlaylist' --output ./local_exports/One
+      ./run.sh validate ./local_exports/One
+EOF
