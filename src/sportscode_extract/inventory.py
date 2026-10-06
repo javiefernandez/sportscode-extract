@@ -88,7 +88,8 @@ def inspect_package(path, ffprobe=None, tolerance=0.02, timing_config=None):
                     issue('unresolved_reference', 'Declared stream metadata is missing from its video folder', clip['id'])
         for metadata in metadata_files:
             stream = read(metadata)
-            declarations = [item['streams'] for item in (record, video_metadata) if 'streams' in item]
+            # Re-exported videos can leave video.json "streams" empty; treat that as undeclared.
+            declarations = [item['streams'] for item in (record, video_metadata) if item.get('streams')]
             if any(sum(s.get('id') == stream.get('id') for s in declared) != 1 for declared in declarations):
                 for clip in media_clips:
                     if clip.get('videoId') == local_id:

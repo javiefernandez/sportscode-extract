@@ -143,6 +143,15 @@ def test_stream_must_belong_to_its_video_record(package_factory, ffprobe):
     assert result['occurrences'][0].get('selected_stream') is None
 
 
+def test_empty_video_json_streams_uses_record(package_factory, ffprobe):
+    package=package_factory()
+    video=package/'Videos'/'clip0'/'video.json'
+    data=json.loads(video.read_text()); data['streams']=[]; video.write_text(json.dumps(data))
+    result=inspect_package(package,ffprobe=ffprobe)
+    assert not any(issue['kind']=='stream_id_mismatch' for issue in result['report']['issues'])
+    assert result['occurrences'][0]['selected_stream']['id']=='stream0'
+
+
 def test_missing_unselected_declared_stream_is_reported(package_factory, ffprobe):
     package=package_factory()
     mutate(package,lambda p:p['videos'][0]['streams'].append({'id':'missing-unselected'}))
